@@ -9,6 +9,7 @@ services:
       - "9000:9000"
     volumes:
       - ./click-house/star_schema.sql:/docker-entrypoint-initdb.d/star_schema.sql
+      - ./click-house/data:/var/lib/clickhouse
     networks:
       - my-network
   db:
@@ -44,6 +45,20 @@ services:
       - db
     networks:
       - my-network
+  jupyter:
+    container_name: jupyter_container
+    image: jupyter/base-notebook:latest
+    ports:
+      - "8888:8888"
+    volumes:
+      - ./notebooks:/home/jovyan/notebooks
+      - ./demo_excels:/home/jovyan/demo_excels
+      - ./requirements.txt:/home/jovyan/notebooks/requirements.txt
+    environment:
+      JUPYTER_ENABLE_LAB: "yes"
+    networks:
+      - my-network
+    command: bash -c "pip install -r /home/jovyan/notebooks/requirements.txt && start-notebook.sh"
 
   airflow:
     container_name: airflow_container
@@ -76,55 +91,6 @@ services:
 
   # dbt:
   #   image: ghcr.io/dbt-labs/dbt-postgres:1.9.latest
-  clickhouse:
-    container_name: clickhouse_container
-    image: clickhouse/clickhouse-server:23.8
-    ports:
-      - "8123:8123"
-      - "9000:9000"
-    volumes:
-      - ./click-house/star_schema.sql:/docker-entrypoint-initdb.d/star_schema.sql
-    networks:
-      - my-network
-  clickhouse:
-    container_name: clickhouse_container
-    image: clickhouse/clickhouse-server:23.8
-    ports:
-      - "8123:8123"
-      - "9000:9000"
-    volumes:
-      - ./click-house/star_schema.sql:/docker-entrypoint-initdb.d/star_schema.sql
-    networks:
-      - my-network
-    container_name: dbt_container
-    image: ghcr.io/dbt-labs/dbt-postgres:1.9.latest
-    volumes:
-      - ./dbt:/root/dbt
-    working_dir: /root/dbt/my_project
-    environment:
-      DBT_PROFILES_DIR: "/root/.dbt"
-    depends_on:
-      - db
-    networks:
-      - my-network
-    entrypoint: ["/bin/bash", "-c"]
-    command: |
-      "mkdir -p /root/.dbt && 
-      echo 'my_project:
-        outputs:
-          dev:
-            type: postgres
-            host: db
-            user: ${POSTGRES_USER}
-            pass: ${POSTGRES_PASSWORD}
-            port: 5432
-            dbname: ${POSTGRES_DB}
-            schema: weather_data
-            threads: 4
-        target: dev' > /root/.dbt/profiles.yml &&
-      chmod -R 777 /root/dbt &&
-      dbt run &&
-      tail -f /dev/null"
 
   superset:
     container_name: superset_container
