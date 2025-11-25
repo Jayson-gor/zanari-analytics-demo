@@ -9,6 +9,12 @@ venv/
 # PostgreSQL data
 postgres/data/
 
+# ClickHouse runtime data
+click-house/data/
+
+# Airflow logs
+airflow/logs/
+
 # Python cache files
 __pycache__/
 *.py[cod]
