@@ -1,14 +1,33 @@
 import psycopg2
 
 DB_CONFIG = {
-    'host': 'db',
+    'host': 'postgres',
     'port': 5432,
     'dbname': 'erp_db',
     'user': 'erp_user',
     'password': 'erp_pass',
 }
 
-rows = [
+accounts = [
+    (1000,'Cash','Asset','Cash on hand'),
+    (1100,'Accounts Receivable','Asset','Customer balances'),
+    (1200,'Inventory','Asset','Fuel stock'),
+    (2000,'Accounts Payable','Liability','Supplier balances'),
+    (2100,'Loans Payable','Liability','Bank loans'),
+    (3000,"Owner's Equity",'Equity','Capital account'),
+    (3100,'Retained Earnings','Equity','Accumulated profits'),
+    (4000,'Sales Revenue','Income','Fuel sales'),
+    (4100,'Other Income','Income','Miscellaneous income'),
+    (5000,'Fuel Purchase','Expense','Cost of fuel'),
+    (5100,'Transport Expense','Expense','Delivery costs'),
+    (5200,'Salaries','Expense','Employee wages'),
+    (5300,'Miscellaneous Expense','Expense','Other expenses'),
+    (5400,'Bank KCB','Asset','KCB bank account'),
+    (5500,'Bank ABSA','Asset','ABSA bank account'),
+    (5600,'Bank COOP','Asset','COOP bank account')
+]
+
+balances = [
     (1000, 'Cash', 14585.44),
     (1100, 'Accounts Receivable', 25393.35),
     (1200, 'Inventory', 25730.77),
@@ -29,12 +48,23 @@ rows = [
 
 conn = psycopg2.connect(**DB_CONFIG)
 cur = conn.cursor()
-for row in rows:
+
+# Insert accounts
+for acc in accounts:
+    cur.execute("""
+        INSERT INTO erp.coa(account_code, account_name, account_type, description)
+        VALUES (%s, %s, %s, %s)
+        ON CONFLICT DO NOTHING;
+    """, acc)
+
+# Insert opening balances
+for bal in balances:
     cur.execute("""
         INSERT INTO erp.opening_balances(account_code, account_name, opening_balance)
         VALUES (%s, %s, %s);
-    """, row)
+    """, bal)
+
 conn.commit()
 cur.close()
 conn.close()
-print("Opening balances inserted successfully.")
+print("Accounts and opening balances inserted successfully.")

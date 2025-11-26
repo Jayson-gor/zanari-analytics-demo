@@ -1,0 +1,23 @@
+{
+  "name": "erp-postgres-connector",
+  "config": {
+    "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+    "database.hostname": "db",
+    "database.port": "5432",
+    "database.user": "erp_user",
+    "database.password": "erp_pass",
+    "database.dbname": "erp_db",
+    "database.server.name": "erp",
+    "table.include.list": "erp.sales,erp.purchases,erp.transactions,erp.coa,erp.opening_balances,erp.outbox",
+    "plugin.name": "pgoutput",
+    "slot.name": "debezium_slot",
+    "publication.name": "debezium_pub",
+    "database.history.kafka.bootstrap.servers": "kafka:9092",
+    "database.history.kafka.topic": "schema-changes.erp",
+    "key.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "key.converter.schemas.enable": "false",
+    "value.converter.schemas.enable": "false",
+    "topic.prefix": "erp"
+  }
+}

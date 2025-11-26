@@ -11,7 +11,7 @@ import datetime
 
 # --- CONFIG ---
 POSTGRES_CONFIG = {
-    'host': 'db',
+    'host': 'db',  # Docker Compose service name for Postgres
     'port': 5432,
     'dbname': 'erp_db',
     'user': 'erp_user',

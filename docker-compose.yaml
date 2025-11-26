@@ -1,6 +1,119 @@
 version: '3.8'
 
 services:
+  erp_excel_batch_loader:
+    image: python:3.11
+    container_name: erp_excel_batch_loader
+    volumes:
+      - ./batch-loading-scripts:/app
+    working_dir: /app
+    command: bash -c "pip install pandas psycopg2-binary && python erp_excel_batch_loader.py"
+    depends_on:
+      - db
+      - clickhouse
+    networks:
+      - my-network
+
+  opening_balances:
+    image: python:3.11
+    container_name: opening_balances
+    volumes:
+      - ./batch-loading-scripts:/app
+    working_dir: /app
+    command: bash -c "pip install psycopg2-binary && python opening-balances.py"
+    depends_on:
+      - db
+      - clickhouse
+    networks:
+      - my-network
+
+  erp_to_clickhouse_etl:
+    image: python:3.11
+    container_name: erp_to_clickhouse_etl
+    volumes:
+      - ./batch-loading-scripts:/app
+    working_dir: /app
+    command: bash -c "pip install clickhouse-driver psycopg2-binary && python erp_to_clickhouse_etl.py"
+    depends_on:
+      - db
+      - clickhouse
+    networks:
+      - my-network
+
+  kafka-consumer:
+    build: ./streaming-consumer
+    container_name: kafka_consumer_container
+    depends_on:
+      - kafka
+      - clickhouse
+    networks:
+      - my-network
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: zookeeper_container
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    networks:
+      - my-network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka_container
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+    ports:
+      - "9092:9092"
+      - "9093:9093"
+    networks:
+      - my-network
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka_ui_container
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+    depends_on:
+      - kafka
+    networks:
+      - my-network
+
+  debezium:
+    image: debezium/connect:2.4
+    container_name: debezium_container
+    ports:
+      - "8083:8083"
+    environment:
+      BOOTSTRAP_SERVERS: kafka:9092
+      GROUP_ID: 1
+      CONFIG_STORAGE_TOPIC: debezium_connect_configs
+      OFFSET_STORAGE_TOPIC: debezium_connect_offsets
+      STATUS_STORAGE_TOPIC: debezium_connect_statuses
+      KEY_CONVERTER_SCHEMAS_ENABLE: "false"
+      VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
+      CONNECT_REST_ADVERTISED_HOST_NAME: debezium
+      CONNECT_PLUGIN_PATH: /kafka/connect,/debezium-connector-postgres
+    depends_on:
+      - kafka
+      - db
+    networks:
+      - my-network
+
   clickhouse:
     container_name: clickhouse_container
     image: clickhouse/clickhouse-server:23.8
@@ -12,6 +125,7 @@ services:
       - ./click-house/data:/var/lib/clickhouse
     networks:
       - my-network
+
   db:
     container_name: postgres_container
     image: postgres:14.19
@@ -21,6 +135,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_INITDB_ARGS: --wal-level=logical
     ports:
       - "5000:5432"
     volumes:
@@ -126,6 +241,21 @@ services:
     volumes:
       - ./click-house/star_schema.sql:/docker-entrypoint-initdb.d/star_schema.sql
       - ./click-house/data:/var/lib/clickhouse
+    networks:
+      - my-network
+
+  streaming-consumer:
+    image: python:3.11
+    container_name: streaming_consumer_container
+    environment:
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./streaming-consumer:/app
+    working_dir: /app
+    command: bash -c "pip install confluent-kafka clickhouse-driver && python kafka_to_clickhouse_consumer.py"
+    depends_on:
+      - kafka
+      - clickhouse
     networks:
       - my-network
 
