@@ -1,6 +1,21 @@
+  # ...existing code...
 version: '3.8'
 
 services:
+  metabase:
+    image: metabase/metabase:latest
+    container_name: metabase_container
+    ports:
+      - "3000:3000"
+    environment:
+      MB_DB_FILE: /metabase-data/metabase.db
+    volumes:
+      - ./metabase_data:/metabase-data
+    depends_on:
+      - clickhouse
+    networks:
+      - my-network
+
   erp_excel_batch_loader:
     image: python:3.11
     container_name: erp_excel_batch_loader
@@ -209,28 +224,21 @@ services:
 
   superset:
     container_name: superset_container
-    image: apache/superset:3.0.0-py310
+    build:
+      context: ./docker
+      dockerfile: superset.Dockerfile
     environment:
       - SUPERSET_SECRET_KEY=my_secret_key_change_me
-      - DATABASE_DIALECT=postgresql+psycopg2
-      - DATABASE_USER=user
-      - DATABASE_PASSWORD=password
-      - DATABASE_HOST=db
-      - DATABASE_PORT=5432
-      - DATABASE_DB=weather_data
+      - SUPERSET_DATABASE_URI=postgresql+psycopg2://superset_user:superset_pass@db:5432/superset
     ports:
       - "8088:8088"
     depends_on:
       - db
     networks:
       - my-network
-    command: >
-      bash -c "
-      pip install psycopg2-binary &&
-      superset db upgrade &&
-      superset fab create-admin --username admin --firstname Admin --lastname User --email admin@superset.com --password admin &&
-      superset init &&
-      superset run -h 0.0.0.0 -p 8088 --with-threads --reload --debugger"
+    volumes:
+      - ./postgres/superset_init.sql:/docker-entrypoint-initdb.d/superset_init.sql
+      - ./docker/requirements-local.txt:/app/requirements-local.txt
 
   clickhouse:
     container_name: clickhouse_container
